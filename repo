@@ -1,0 +1,182 @@
+#!/bin/bash
+
+# (C) 2014 David Greaves david.greaves@jolla.com
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
+
+STORE=/srv/service/repo
+SVC=""
+REPO=""
+OUTDIR=""
+URL=""
+LOCK="$STORE/service_running.pid"
+SERVICES="github|mer"
+repocmd=/usr/bin/repo
+
+WAIT_MINS=120 # in mins
+
+get_lock() {
+    (( WAIT=WAIT_MINS*10 )) # 6 second polling
+    # Wait for any lockfile to be removed for a max of 2hrs
+    c=1
+    while [ -f $LOCK ] && (( c++ < $WAIT )); do
+	# Check for stale lock
+	pid=$(cat $LOCK)
+	if ! kill -0 $pid > /dev/null ; then
+	    echo "Detected stale lock - running"
+	    rm -f $LOCK
+	    (( c-- )) # just in case we hit the limit just as the stale lock was spotted
+	else
+	    echo "repo service lock exists. Waiting"
+	    sleep 6
+	fi
+    done
+    if (( c >= $WAIT )); then
+	echo "repo service could not run within $WAIT_MINS mins"
+	exit 1
+    fi
+
+    # Set a trap to cleanup if we exit
+    trap 'rm -f $LOCK' EXIT
+    echo "$$" > $LOCK
+}
+
+usage() {
+  cat <<EOF
+Usage: $0 --service <service> --initrepo <path/pkg> --branch <branch> | --tag <tag>  [--outdir <outdir>]
+Options:
+  --service <service>      Git hosting service to use ($SERVICES)
+  --initrepo <path/pkg>    Repository path to check out
+  --branch <branch>        Branch to use for repo init
+  --tag <tag>              Tag to use for repo init
+  --outdir <outdir>        Move files to outdir after checkout (optional)
+
+Examples:
+  $0 --service github --initrepo mer-hybris/android --branch hybris-10.1
+
+Only one instance of this service can run at once.
+
+EOF
+}
+
+fatal() {
+    usage
+    echo $@
+    exit 1
+}
+
+while test $# -gt 0; do
+  case $1 in
+    *-service)
+      SVC="$2"
+      shift
+    ;;
+    *-initrepo)
+      REPO="$2"
+      shift
+    ;;
+    *-branch)
+      BRANCH="$2"
+      shift
+    ;;
+    *-tag)
+      TAG="$2"
+      shift
+    ;;
+    *-outdir)
+      OUTDIR="$2"
+      shift
+    ;;
+    -h|*-help)
+      usage
+      exit 0
+    ;;
+    *)
+      usage
+      echo Unknown parameter $1.
+      exit 1
+    ;;
+  esac
+  shift
+done
+
+if [ -z "$SVC" ]; then
+    fatal "ERROR: no --service parameter ($SERVICES)"
+fi
+if [ -z "$REPO" ]; then
+    fatal "ERROR: no --initrepo parameter"
+fi
+if [ -z "$BRANCH" ]; then
+    fatal "ERROR: no --branch parameter"
+fi
+
+repo_regexp="^[A-Za-z0-9_-]*/[A-Za-z0-9_-]*$"
+if ! [[ $REPO =~ $repo_regexp ]]; then
+    fatal "ERROR: repo '$REPO'is not in area/repo format (omit .git and any http://.../ part)"
+fi
+
+
+WORKDIR=""
+
+tag_regexp="^[A-Za-z0-9_.-]*$"
+if ! [[ $TAG =~ $tag_regexp ]]; then
+    fatal "ERROR: repo '$TAG'is not valid (must match '$tag_regexp')"
+fi
+
+case "$SVC" in
+    github)
+        URL="git://github.com/${REPO}.git" ;;
+    mer)
+        URL="http://git.merproject.org/${REPO}.git/" ;;
+    *)
+        echo "Sorry, git service $SVC is not whitelisted. please contact lbt in #mer"
+        exit 1 ;;
+esac
+
+PRJDIR=$(pwd)
+cd $STORE 2>/dev/null
+
+# If $STORE does not exist, create a sensible directory. This makes
+# sense in local service runs.
+if [ $? -ne 0 ]; then
+    echo "Note: $STORE path not found. Creating a local repo directory."
+    TMPSTORE=./repo.tmp
+    mkdir -p $TMPSTORE
+    cd $TMPSTORE
+fi
+
+get_lock
+
+# Get the manifest
+$repocmd init -u $URL -b $BRANCH
+
+# Get the git repos
+$repocmd sync
+
+# Store the manifest for use in packaging
+$repocmd manifest -r -o repo_service_manifest.xml
+
+# Pre-process all the .spec files in rpm/ and actually replace %include with the included file
+for spec in rpm/*.spec; do
+    perl -i -ne 'if (/^%include\s+([\w-.\/]+)$/) { local $_; print "# repo service performed : %%include $1\n"; open I,"<$1"; while (<I>) {print "$_";}} else { print $_;}' $spec
+done
+
+# Create a tarball
+find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm \) -print | tar c --bzip2 -f repo.tar.bzip2 --files-from - 
+(cd rpm; find . -mindepth 1 -maxdepth 1 -type d -print  | tar c --bzip2 -f ../rpm.tar.bzip2 --files-from - )
+
+if [ ! -z "$OUTDIR" ]; then
+    # Move all files to OUTDIR
+   mv repo.tar.bzip2 "$OUTDIR"
+   mv rpm/* "$OUTDIR"
+   mv rpm.tar.bzip2 "$OUTDIR"
+fi
+
+# Tidy up
+find . -mindepth 1 -maxdepth 1 -not -name .repo -print0 | xargs -0 rm -rf
+
+exit 0

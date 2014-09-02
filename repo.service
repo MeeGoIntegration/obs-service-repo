@@ -1,0 +1,19 @@
+<service name="repo">
+  <summary>Clone from a repo manifest</summary>
+  <description>This service uses repo to pull/clone repos and then extracts the src into a tarball.</description>
+  <parameter name="service">
+    <description>Approved Git Service such as gitorious/github etc</description>
+    <allowedvalue>github</allowedvalue>
+    <allowedvalue>mer</allowedvalue>
+  </parameter>
+  <parameter name="initrepo">
+    <description>Name of the repository containing the manifest for repo init (eg mer-hybris/android.git)</description>
+  </parameter>
+  <parameter name="branch">
+    <description>Branch of the repo to use for the manifest (eg hybris-10.1)</description>
+  </parameter>
+  <parameter name="tag">
+    <description>Tag containing the manifest (tag overrides branch)</description>
+    <required/>
+  </parameter>
+</service>
