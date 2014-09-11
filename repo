@@ -167,12 +167,12 @@ done
 
 # Create a tarball
 find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm \) -print | tar c --bzip2 -f repo.tar.bzip2 --files-from - 
-(cd rpm; find . -mindepth 1 -maxdepth 1 -type d -print  | tar c --bzip2 -f ../rpm.tar.bzip2 --files-from - )
+(cd rpm; find . -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print  | tar c --bzip2 -f ../rpm.tar.bzip2 --files-from - )
 
 if [ ! -z "$OUTDIR" ]; then
     # Move all files to OUTDIR
    mv repo.tar.bzip2 "$OUTDIR"
-   mv rpm/* "$OUTDIR"
+   (cd rpm; find . -mindepth 1 -maxdepth 1 -type f | xargs -I '{}' mv '{}' "$OUTDIR")
    mv rpm.tar.bzip2 "$OUTDIR"
 fi
 
