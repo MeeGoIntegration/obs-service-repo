@@ -19,7 +19,7 @@ repocmd=/usr/bin/repo
 
 WAIT_MINS=120 # in mins
 
-get_lock() {
+get_lock_which_releases_on_exit() {
     (( WAIT=WAIT_MINS*10 )) # 6 second polling
     # Wait for any lockfile to be removed for a max of 2hrs
     c=1
@@ -41,7 +41,7 @@ get_lock() {
     fi
 
     # Set a trap to cleanup if we exit
-    trap 'rm -f $LOCK' EXIT
+    trap 'tidy_up_and_remove_lock' EXIT
     echo "$$" > $LOCK
 }
 
@@ -68,6 +68,55 @@ fatal() {
     echo $@
     exit 1
 }
+
+repo_init() {
+    # Get the manifest
+    if ! $repocmd init -u $URL -b $BRANCH; then
+	fatal "command 'repo init -u $URL -b $BRANCH' returned an error"
+    fi
+}
+
+repo_sync() {
+    # Get the git repos
+    $repocmd sync || fatal "'repo sync' command failed"
+}
+
+store_manifest() {
+    # Store the manifest for use in packaging
+    $repocmd manifest -r -o repo_service_manifest.xml  || fatal "'repo manifest' command failed"
+}
+
+process_spec_files() {
+    # Pre-process all the .spec files in rpm/ and actually replace %include with the included file
+    for spec in rpm/*.spec; do
+	perl -i -ne 'if (/^%include\s+([\w-.\/]+)$/) { local $_; print "# repo service performed : %%include $1\n"; open I,"<$1"; while (<I>) {print "$_";}} else { print $_;}' $spec
+    done
+}
+
+create_tarballs() {
+    find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm \) -print | tar c --bzip2 -f repo.tar.bzip2 --files-from -  || fatal "'tar' command failed creating repo.tar.bzip2"
+	(cd rpm; find . -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print  | tar c --bzip2 -f ../rpm.tar.bzip2 --files-from - ) || fatal "'tar' command failed creating rpm.tar.bzip2"
+}
+
+move_package_files() {
+    if [ ! -z "$OUTDIR" ]; then
+	# Move all files to OUTDIR
+	mv repo.tar.bzip2 "$OUTDIR"
+	(cd rpm; find . -mindepth 1 -maxdepth 1 -type f | xargs -I '{}' mv '{}' "$OUTDIR")
+	mv rpm.tar.bzip2 "$OUTDIR"
+    fi
+}
+
+tidy_up() {
+    # Only clean up if we can enter the STORE directory
+    cd $STORE && find . -mindepth 1 -maxdepth 1 -not -name .repo -and -not -name service_running.pid -print0 | xargs -0 rm -rf
+}
+
+tidy_up_and_remove_lock() {
+    tidy_up
+    rm -f $LOCK
+}
+
 
 while test $# -gt 0; do
   case $1 in
@@ -138,45 +187,23 @@ case "$SVC" in
 esac
 
 PRJDIR=$(pwd)
-cd $STORE 2>/dev/null
 
-# If $STORE does not exist, create a sensible directory. This makes
-# sense in local service runs.
-if [ $? -ne 0 ]; then
+if [[ ! -d $STORE ]]; then
     echo "Note: $STORE path not found. Creating a local repo directory."
-    TMPSTORE=./repo.tmp
-    mkdir -p $TMPSTORE
-    cd $TMPSTORE
+    STORE=./repo.tmp
+    mkdir -p $STORE || fatal "Could not create $STORE"
 fi
 
-get_lock
+cd $STORE
 
-# Get the manifest
-$repocmd init -u $URL -b $BRANCH
-
-# Get the git repos
-$repocmd sync
-
-# Store the manifest for use in packaging
-$repocmd manifest -r -o repo_service_manifest.xml
-
-# Pre-process all the .spec files in rpm/ and actually replace %include with the included file
-for spec in rpm/*.spec; do
-    perl -i -ne 'if (/^%include\s+([\w-.\/]+)$/) { local $_; print "# repo service performed : %%include $1\n"; open I,"<$1"; while (<I>) {print "$_";}} else { print $_;}' $spec
-done
-
-# Create a tarball
-find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm \) -print | tar c --bzip2 -f repo.tar.bzip2 --files-from - 
-(cd rpm; find . -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print  | tar c --bzip2 -f ../rpm.tar.bzip2 --files-from - )
-
-if [ ! -z "$OUTDIR" ]; then
-    # Move all files to OUTDIR
-   mv repo.tar.bzip2 "$OUTDIR"
-   (cd rpm; find . -mindepth 1 -maxdepth 1 -type f | xargs -I '{}' mv '{}' "$OUTDIR")
-   mv rpm.tar.bzip2 "$OUTDIR"
-fi
-
-# Tidy up
-find . -mindepth 1 -maxdepth 1 -not -name .repo -print0 | xargs -0 rm -rf
+get_lock_which_releases_on_exit
+tidy_up
+repo_init
+repo_sync
+store_manifest
+process_spec_files
+create_tarballs
+move_package_files
+tidy_up
 
 exit 0
