@@ -76,6 +76,13 @@ repo_init() {
     fi
 }
 
+use_repo_local() {
+    if [[ -d .repo/manifests/local_manifests ]]; then
+        echo "Using local_manifests"
+        ln -s manifests/local_manifests/ .repo/
+    fi
+}
+
 repo_sync() {
     # Get the git repos
     $repocmd sync || fatal "'repo sync' command failed"
@@ -199,6 +206,7 @@ cd $STORE
 get_lock_which_releases_on_exit
 tidy_up
 repo_init
+use_repo_local
 repo_sync
 store_manifest
 process_spec_files
