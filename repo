@@ -85,7 +85,7 @@ use_repo_local() {
 
 repo_sync() {
     # Get the git repos
-    $repocmd sync || fatal "'repo sync' command failed"
+    $repocmd sync --fetch-submodules || fatal "'repo sync' command failed"
 }
 
 store_manifest() {
