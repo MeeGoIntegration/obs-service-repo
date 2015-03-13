@@ -1,12 +1,12 @@
 Name: obs-service-repo
 Summary: Repo service designed for droid-hal-device builds
-Version: 0.1
+Version: 0.2
 Release: 1
 Group: Development/Tools
 License: GPLv2
 URL: https://git.merproject.org/mer-obs/obs-repo-service
 Sources:
-  - '%{name}-%{version}.tar.bz2'
+  - '%{name}-%{version}.tar.xz'
 Builder: none
 Configure: none
 Requires:
@@ -14,9 +14,9 @@ Requires:
   - git-core
   - python
 Files:
-  - '/usr/lib/obs/'
+  - /usr/lib/obs/
   - '%defattr(755,root,root,-)'
-  - '/usr/lib/obs/service/repo'
+  - /usr/lib/obs/service/repo
   - '%{_bindir}/repo'
 Patches: []
 SetupOptions: -q -n src

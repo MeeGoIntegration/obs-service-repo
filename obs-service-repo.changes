@@ -1,3 +1,10 @@
+* Fri Mar 13 2015 David Greaves <david@dgreaves.com> - 0.2-1
+- Add jolla's repos to the whitelist - obviously this should use site specific config at some point :/
+- Handle any repos with submodules
+- Use the local_manifests/ if it's in the repo
+- Refactor repo and handle more unexpected situations
+- Ensure symlinks are put in the rpm tarball
+
 * Tue Sep 02 2014 David Greaves <david@dgreaves.com> - 0.1-1
 - Initial packaging
 

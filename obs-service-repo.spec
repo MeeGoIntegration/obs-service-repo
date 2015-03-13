@@ -9,12 +9,12 @@ Name:       obs-service-repo
 # << macros
 
 Summary:    Repo service designed for droid-hal-device builds
-Version:    0.1
+Version:    0.2
 Release:    1
 Group:      Development/Tools
 License:    GPLv2
 URL:        https://git.merproject.org/mer-obs/obs-repo-service
-Source0:    %{name}-%{version}.tar.bz2
+Source0:    %{name}-%{version}.tar.xz
 Source100:  obs-service-repo.yaml
 Requires:   obs-source_service
 Requires:   git-core
