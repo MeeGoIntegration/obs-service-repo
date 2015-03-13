@@ -14,7 +14,7 @@ REPO=""
 OUTDIR=""
 URL=""
 LOCK="$STORE/service_running.pid"
-SERVICES="github|mer"
+SERVICES="github|mer|jolla"
 repocmd=/usr/bin/repo
 
 WAIT_MINS=120 # in mins
@@ -188,6 +188,8 @@ case "$SVC" in
         URL="git://github.com/${REPO}.git" ;;
     mer)
         URL="http://git.merproject.org/${REPO}.git/" ;;
+    jolla)
+        URL="https://git.jollamobile.com/${REPO}.git/" ;;
     *)
         echo "Sorry, git service $SVC is not whitelisted. please contact lbt in #mer"
         exit 1 ;;
