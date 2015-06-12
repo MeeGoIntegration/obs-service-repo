@@ -94,13 +94,21 @@ repo_sync() {
 store_manifest() {
     # Store the manifest for use in packaging
     $repocmd manifest -r -o repo_service_manifest.xml  || fatal "'repo manifest' command failed"
+    # Annoyingly the manifest created above is mv'ed out of the
+    # SOURCE/ area by existing spec files so we add a copy of it for
+    # use by the cache and for promotion purposes
+    cp repo_service_manifest.xml as_built_manifest.xml
 }
 
 process_spec_files() {
     # Pre-process all the .spec files in rpm/ and actually replace %include with the included file
     for spec in rpm/*.spec; do
 	perl -i -ne 'BEGIN { sub pinc {if (/^%include\s+([\w-.\/]+)$/) { print "# repo service performed : %%include $1\n"; local (*I); open I,"<$1" or print "# Couldnt open $1\n"; while (<I>) { pinc(); }; } else { print $_; }}} pinc;' $spec
+	# Add the as_built_manifest.xml to the Sources
+	perl -i -e 'while (<>) { print $_; last if /^Source/;}; print "Source755: as_built_manifest.xml\n"; while (<>) { print $_;} ' $spec
+
     done
+
 }
 
 check_cache_and_exit_if_hit() {
@@ -136,9 +144,9 @@ create_tarballs() {
 }
 
 cache_results() {
-    # Use the newly created repo_service_manifest.xml as the key for
+    # Use the newly created as_built_manifest.xml as the key for
     # these tarballs:
-    SHA1=$(sha1sum repo_service_manifest.xml | cut -f1 -d" ")
+    SHA1=$(sha1sum as_built_manifest.xml | cut -f1 -d" ")
 
     ln repo.tar.bzip2 ${CACHE}/${SHA1}_repo.tar.bzip2
     ln rpm.tar.bzip2 ${CACHE}/${SHA1}_rpm.tar.bzip2
