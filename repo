@@ -17,21 +17,21 @@ LOCK="$STORE/service_running.pid"
 SERVICES="github|mer|jolla"
 repocmd=/usr/bin/repo
 
-WAIT_MINS=120 # in mins
+WAIT_MINS=480 # in mins
 
 get_lock_which_releases_on_exit() {
     (( WAIT=WAIT_MINS*10 )) # 6 second polling
-    # Wait for any lockfile to be removed for a max of 2hrs
+    # Wait for any lockfile to be removed for a max of WAIT_MINS
     c=1
-    while [ -f $LOCK ] && (( c++ < $WAIT )); do
+    while [ -f $LOCK ] && (( c < $WAIT )); do
 	# Check for stale lock
 	pid=$(cat $LOCK)
 	if ! kill -0 $pid > /dev/null ; then
 	    echo "Detected stale lock - running"
 	    rm -f $LOCK
-	    (( c-- )) # just in case we hit the limit just as the stale lock was spotted
 	else
 	    echo "repo service lock exists. Waiting"
+	    (( c++ ))
 	    sleep 6
 	fi
     done
