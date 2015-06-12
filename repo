@@ -99,7 +99,7 @@ store_manifest() {
 process_spec_files() {
     # Pre-process all the .spec files in rpm/ and actually replace %include with the included file
     for spec in rpm/*.spec; do
-	perl -i -ne 'if (/^%include\s+([\w-.\/]+)$/) { local $_; print "# repo service performed : %%include $1\n"; open I,"<$1"; while (<I>) {print "$_";}} else { print $_;}' $spec
+	perl -i -ne 'BEGIN { sub pinc {if (/^%include\s+([\w-.\/]+)$/) { print "# repo service performed : %%include $1\n"; local (*I); open I,"<$1" or print "# Couldnt open $1\n"; while (<I>) { pinc(); }; } else { print $_; }}} pinc;' $spec
     done
 }
 
