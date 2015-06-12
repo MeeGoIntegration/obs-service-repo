@@ -9,6 +9,9 @@
 # See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
 
 STORE=/srv/service/repo
+# Note the CACHE *must* be on the same fs as the STORE (and OUTDIR)
+# to avoid inter-fs copying.
+CACHE=/srv/service/repo/.cache
 SVC=""
 REPO=""
 OUTDIR=""
@@ -100,9 +103,50 @@ process_spec_files() {
     done
 }
 
+check_cache_and_exit_if_hit() {
+    # We only check the cache if *every* project has a "revision" attribute
+    # since any project without one may have changed
+    MANIFEST=.repo/manifests/default.xml
+    grep "<project" $MANIFEST | grep -vq "revision" && return
+
+    # Check the cache:
+    SHA1=$(sha1sum $MANIFEST | cut -f1 -d" ")
+    if  [[ -f ${CACHE}/${SHA1}_repo.tar.bzip2 ]] && \
+	[[ -f ${CACHE}/${SHA1}_rpm.tar.bzip2 ]] && \
+	[[ -f ${CACHE}/${SHA1}_cache.tar.bzip2 ]] ; then
+	# Found a full cache; move the big tarball and the rpm/
+	# subtree tarball to cwd
+	# use a hard link to avoid a wasteful copy
+	ln ${CACHE}/${SHA1}_repo.tar.bzip2 ${CACHE}/${SHA1}_rpm.tar.bzip2 $OUTDIR
+	# and unpack any files into $OUTDIR
+	tar xjf ${CACHE}/${SHA1}_rpmfiles.tar.bzip2 -C $OUTDIR
+	echo "Used cached tarballs - done"
+	exit 0
+    else
+	echo "No cached tarballs found. Continuing to build a new tarball set"
+	return
+    fi
+}
+
 create_tarballs() {
     find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm \) -print | tar c --bzip2 -f repo.tar.bzip2 --files-from -  || fatal "'tar' command failed creating repo.tar.bzip2"
+	# Now store any subdirs and symlinks in rpm/ that need keeping
+	# SOURCE: files are moved directly to $OUTDIR
 	(cd rpm; find . -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print  | tar c --bzip2 -f ../rpm.tar.bzip2 --files-from - ) || fatal "'tar' command failed creating rpm.tar.bzip2"
+}
+
+cache_results() {
+    # Use the newly created repo_service_manifest.xml as the key for
+    # these tarballs:
+    SHA1=$(sha1sum repo_service_manifest.xml | cut -f1 -d" ")
+
+    ln repo.tar.bzip2 ${CACHE}/${SHA1}_repo.tar.bzip2
+    ln rpm.tar.bzip2 ${CACHE}/${SHA1}_rpm.tar.bzip2
+    # The files (not dirs) in rpm/* will be needed
+    (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c  --files-from - --bzip2 -C $OUTDIR -f ${CACHE}/${SHA1}_rpmfiles.tar.bzip2 )
+    
+    echo "Tarballs have been cached as :"
+    ls -laF ${CACHE}/${SHA1}*
 }
 
 move_package_files() {
@@ -208,11 +252,13 @@ cd $STORE
 get_lock_which_releases_on_exit
 tidy_up
 repo_init
+check_cache_and_exit_if_hit
 use_repo_local
 repo_sync
 store_manifest
 process_spec_files
 create_tarballs
+cache_results
 move_package_files
 tidy_up
 
