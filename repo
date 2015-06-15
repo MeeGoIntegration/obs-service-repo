@@ -20,7 +20,8 @@ LOCK="$STORE/service_running.pid"
 SERVICES="github|mer|jolla"
 repocmd=/usr/bin/repo
 SHA1ONLY=no
-MANIFEST=.repo/manifests/default.xml
+MANIFEST_NAME=default.xml
+MANIFEST=.repo/manifests/$MANIFEST_NAME
 
 WAIT_MINS=480 # in mins
 
@@ -59,6 +60,7 @@ Options:
   --branch <branch>        Branch to use for repo init
   --tag <tag>              Tag to use for repo init
   --sha1-only              Don't run the service unless every <project> has a sha1 revision
+  --manifest-name <name>   Use the manifest called 'name' (default: default.xml)
   --outdir <outdir>        Move files to outdir after checkout (optional)
 
 Examples:
@@ -77,8 +79,8 @@ fatal() {
 
 repo_init() {
     # Get the manifest
-    if ! $repocmd init -u $URL -b $BRANCH; then
-	fatal "command 'repo init -u $URL -b $BRANCH' returned an error"
+    if ! $repocmd init -u $URL -b $BRANCH -m $MANIFEST_NAME; then
+	fatal "command 'repo init -u $URL -b $BRANCH -m $MANIFEST_NAME' returned an error"
     fi
 }
 
@@ -208,6 +210,11 @@ while test $# -gt 0; do
     ;;
     *-sha1-only)
       SHA1ONLY=yes
+    ;;
+    *-manifest-name)
+      MANIFEST_NAME=$2
+      MANIFEST=".repo/manifests/$2"
+      shift
     ;;
     *-outdir)
       OUTDIR="$2"
