@@ -19,6 +19,7 @@ URL=""
 LOCK="$STORE/service_running.pid"
 SERVICES="github|mer|jolla"
 repocmd=/usr/bin/repo
+repourl="--repo-url=git://github.com/mer-tools/git-repo.git"
 SHA1ONLY=no
 MANIFEST_NAME=default.xml
 MANIFEST=.repo/manifests/$MANIFEST_NAME
@@ -87,7 +88,7 @@ fatal() {
 
 repo_init() {
     # Get the manifest
-    if ! $repocmd init -u $URL -b $BRANCH -m $MANIFEST_NAME; then
+    if ! $repocmd init $repourl -u $URL -b $BRANCH -m $MANIFEST_NAME; then
 	fatal "command 'repo init -u $URL -b $BRANCH -m $MANIFEST_NAME' returned an error"
     fi
 }
