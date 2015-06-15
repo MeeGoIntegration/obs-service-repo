@@ -1,3 +1,10 @@
+* Mon Jun 15 2015 David Greaves <david@dgreaves.com> - 0.3-1
+- Caching support based on sha1-ised manifest
+- Allow service to: require sha1-ised manifests; specify manifest name
+- Create 'as_built' manifest
+- Enable proxy support
+- Understand nested includes
+
 * Fri Mar 13 2015 David Greaves <david@dgreaves.com> - 0.2-1
 - Add jolla's repos to the whitelist - obviously this should use site specific config at some point :/
 - Handle any repos with submodules

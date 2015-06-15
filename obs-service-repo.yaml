@@ -1,6 +1,6 @@
 Name: obs-service-repo
 Summary: Repo service designed for droid-hal-device builds
-Version: 0.2
+Version: 0.3
 Release: 1
 Group: Development/Tools
 License: GPLv2
