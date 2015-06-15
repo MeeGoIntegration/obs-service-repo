@@ -19,6 +19,8 @@ URL=""
 LOCK="$STORE/service_running.pid"
 SERVICES="github|mer|jolla"
 repocmd=/usr/bin/repo
+SHA1ONLY=no
+MANIFEST=.repo/manifests/default.xml
 
 WAIT_MINS=480 # in mins
 
@@ -56,6 +58,7 @@ Options:
   --initrepo <path/pkg>    Repository path to check out
   --branch <branch>        Branch to use for repo init
   --tag <tag>              Tag to use for repo init
+  --sha1-only              Don't run the service unless every <project> has a sha1 revision
   --outdir <outdir>        Move files to outdir after checkout (optional)
 
 Examples:
@@ -109,6 +112,14 @@ process_spec_files() {
 
     done
 
+}
+
+check_sha1_manifest() {
+    if [[ $SHA1ONLY == yes ]]; then
+	grep "<project" $MANIFEST | grep -vq "revision" || return
+	echo "This service run requires $MANIFEST to be a sha1-ised snapshot manifest"
+	exit 1
+    fi
 }
 
 check_cache_and_exit_if_hit() {
@@ -195,6 +206,9 @@ while test $# -gt 0; do
       TAG="$2"
       shift
     ;;
+    *-sha1-only)
+      SHA1ONLY=yes
+    ;;
     *-outdir)
       OUTDIR="$2"
       shift
@@ -260,6 +274,7 @@ cd $STORE
 get_lock_which_releases_on_exit
 tidy_up
 repo_init
+check_sha1_manifest
 check_cache_and_exit_if_hit
 use_repo_local
 repo_sync
