@@ -25,6 +25,14 @@ MANIFEST=.repo/manifests/$MANIFEST_NAME
 
 WAIT_MINS=480 # in mins
 
+if [ -f /etc/sysconfig/proxy ]; then
+    source /etc/sysconfig/proxy
+    export http_proxy=$HTTP_PROXY
+    export https_proxy=$HTTPS_PROXY
+    export no_proxy=$NO_PROXY
+fi
+
+
 get_lock_which_releases_on_exit() {
     (( WAIT=WAIT_MINS*10 )) # 6 second polling
     # Wait for any lockfile to be removed for a max of WAIT_MINS
@@ -93,7 +101,7 @@ use_repo_local() {
 
 repo_sync() {
     # Get the git repos
-    $repocmd sync --fetch-submodules || fatal "'repo sync' command failed"
+    $repocmd sync --no-clone-bundle --fetch-submodules -j1 || fatal "'repo sync' command failed"
 }
 
 store_manifest() {
