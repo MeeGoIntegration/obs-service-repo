@@ -111,7 +111,7 @@ store_manifest() {
     # Annoyingly the manifest created above is mv'ed out of the
     # SOURCE/ area by existing spec files so we add a copy of it for
     # use by the cache and for promotion purposes
-    cp repo_service_manifest.xml as_built_manifest.xml
+    cp repo_service_manifest.xml rpm/as_built_manifest.xml
 }
 
 process_spec_files() {
@@ -168,7 +168,9 @@ create_tarballs() {
 cache_results() {
     # Use the newly created as_built_manifest.xml as the key for
     # these tarballs:
-    SHA1=$(sha1sum as_built_manifest.xml | cut -f1 -d" ")
+    SHA1=$(sha1sum rpm/as_built_manifest.xml | cut -f1 -d" ")
+
+    mkdir -p ${CACHE}
 
     ln repo.tar.bzip2 ${CACHE}/${SHA1}_repo.tar.bzip2
     ln rpm.tar.bzip2 ${CACHE}/${SHA1}_rpm.tar.bzip2
