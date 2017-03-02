@@ -1,0 +1,3 @@
+github git://github.com/${REPO}.git
+mer    http://git.merproject.org/${REPO}.git/
+jolla  https://git.jollamobile.com/${REPO}.git/

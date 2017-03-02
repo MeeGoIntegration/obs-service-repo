@@ -8,6 +8,21 @@
 # of the License, or (at your option) any later version.
 # See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
 
+if [ -f /usr/lib/obs/service/repo_config ]; then
+    SERVICES=
+    while read svc_name svc_url
+    do
+        if [ -z "$SERVICES" ]; then
+            SERVICES=$name
+        else
+            SERVICES="$SERVICES|$name"
+        fi
+    done < /usr/lib/obs/service/repo_config
+    echo $SERVICES
+else
+    SERVICES="github|mer|jolla"
+fi
+
 STORE=/srv/service/repo
 # Note the CACHE *must* be on the same fs as the STORE (and OUTDIR)
 # to avoid inter-fs copying.
@@ -17,7 +32,6 @@ REPO=""
 OUTDIR=""
 URL=""
 LOCK="$STORE/service_running.pid"
-SERVICES="github|mer|jolla"
 repocmd=/usr/bin/repo
 repourl="--repo-url=git://github.com/mer-tools/git-repo.git"
 SHA1ONLY=no
@@ -267,17 +281,32 @@ if ! [[ $TAG =~ $tag_regexp ]]; then
     fatal "ERROR: repo '$TAG'is not valid (must match '$tag_regexp')"
 fi
 
-case "$SVC" in
-    github)
-        URL="git://github.com/${REPO}.git" ;;
-    mer)
-        URL="http://git.merproject.org/${REPO}.git/" ;;
-    jolla)
-        URL="https://git.jollamobile.com/${REPO}.git/" ;;
-    *)
+if ! [ -f /usr/lib/obs/service/repo_config ]; then
+    case "$SVC" in
+        github)
+            URL="git://github.com/${REPO}.git" ;;
+        mer)
+            URL="http://git.merproject.org/${REPO}.git/" ;;
+        jolla)
+            URL="https://git.jollamobile.com/${REPO}.git/" ;;
+        *)
+            echo "Sorry, git service $SVC is not whitelisted. please contact lbt in #mer"
+            exit 1 ;;
+    esac
+else
+    while read svc_name svc_url
+    do
+        if [ x"$svc_name" == x"$SVC" ]; then
+            break
+        fi
+    done < /usr/lib/obs/service/repo_config
+    if [ -z "$name" ]; then
         echo "Sorry, git service $SVC is not whitelisted. please contact lbt in #mer"
-        exit 1 ;;
-esac
+        exit 1
+    else
+        URL=$(eval echo $url)
+    fi
+fi
 
 PRJDIR=$(pwd)
 
