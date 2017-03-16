@@ -29,7 +29,8 @@ WAIT_MINS=480 # in mins
 if [ -f $REPOCONFIG ]; then
     SERVICES=$(cut -f1 -d\  $REPOCONFIG | paste -s -d\|)
 else
-    SERVICES="github|mer|jolla"
+    echo "Configuration file $REPOCONFIG for obs-service-repo missing."
+    exit 1
 fi
 
 
