@@ -167,7 +167,7 @@ check_cache_and_exit_if_hit() {
 }
 
 create_tarballs() {
-    find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm \) -print | tar c --bzip2 -f repo.tar.bzip2 --files-from -  || fatal "'tar' command failed creating repo.tar.bzip2"
+    find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm -o -name repo.tar.bzip2 \) -print | tar c --bzip2 -f repo.tar.bzip2 --files-from -  || fatal "'tar' command failed creating repo.tar.bzip2"
 	# Now store any subdirs and symlinks in rpm/ that need keeping
 	# SOURCE: files are moved directly to $OUTDIR
 	(cd rpm; find . -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print  | tar c --bzip2 -f ../rpm.tar.bzip2 --files-from - ) || fatal "'tar' command failed creating rpm.tar.bzip2"
