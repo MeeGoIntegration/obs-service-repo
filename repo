@@ -345,7 +345,7 @@ do
     fi
 done < $REPOCONFIG
 if [ -z "$svc_name" ]; then
-    echo "Sorry, git service $SVC is not whitelisted. please contact lbt in #mer"
+    echo "Sorry, git service $SVC is not whitelisted. please contact ask your OBS administrator to add it to the repo config file $REPOCONFIG if you need it."
     exit 1
 else
     URL=${svc_url}${REPO}.git
