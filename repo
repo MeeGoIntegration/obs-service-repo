@@ -8,21 +8,21 @@
 # of the License, or (at your option) any later version.
 # See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
 
-STORE=/srv/service/repo
 # Note the CACHE *must* be on the same fs as the STORE (and OUTDIR)
 # to avoid inter-fs copying.
-CACHE=/srv/service/repo/.cache
 SVC=""
 REPO=""
 OUTDIR=""
 URL=""
-LOCK="$STORE/service_running.pid"
 repocmd=/usr/bin/repo
 repourl="--repo-url=git://github.com/mer-tools/git-repo.git"
 SHA1ONLY=no
 MANIFEST_NAME=default.xml
 MANIFEST=.repo/manifests/$MANIFEST_NAME
+REFXML=.repo/manifests/reference.xml
 REPOCONFIG=/etc/obs/services/repo
+SVCDIR=/srv/service
+CACHE=$SVCDIR/repo/.cache
 
 WAIT_MINS=480 # in mins
 
@@ -41,6 +41,16 @@ if [ -f /etc/sysconfig/proxy ]; then
     export no_proxy=$NO_PROXY
 fi
 
+set_store_and_lock() {
+
+  if [ -z "$REFDEV" ]; then
+    STORE=$SVCDIR/repo
+  else
+    STORE=`mktemp -d -p $SVCDIR`
+  fi
+  LOCK="$STORE/service_running.pid"
+
+}
 
 get_lock_which_releases_on_exit() {
     (( WAIT=WAIT_MINS*10 )) # 6 second polling
@@ -96,9 +106,51 @@ fatal() {
 
 repo_init() {
     # Get the manifest
-    if ! $repocmd init $repourl -u $URL -b $BRANCH -m $MANIFEST_NAME; then
-	fatal "command 'repo init -u $URL -b $BRANCH -m $MANIFEST_NAME' returned an error"
+    if ! $repocmd init $repourl -u $URL -b $BRANCH -m $MANIFEST_NAME $REPOREF; then
+	fatal "command 'repo init -u $URL -b $BRANCH -m $MANIFEST_NAME $REPOREF' returned an error"
     fi
+}
+
+# Example reference.xml file
+#  <reference>
+#     <device name="f5121" url="https://github.com/mer-hybris/android.git" branch="hybris-sony-aosp-6.0.1_r80-20170902"/>
+#     <device name="aosp" url="https://android.googlesource.com/platform/manifest" branch="master"/>
+#  </reference>
+#
+# Currently only "name" attributes are taken into account, but in the future,
+# the url and branch could be used to initialize a reference mirror first.
+#
+# Reference devices should be ordered by preference.
+
+get_reference() {
+    REFPARSE = `python -c "
+import xml.etree.cElementTree
+import sys
+import os
+try:
+    ref = xml.etree.ElementTree.parse('$REFXML').getroot()
+except:
+    print 'Error parsing reference.xml file'
+    sys.exit(1)
+for device in ref:
+    if device.tag == 'device' and 'name' in device.attrib:
+        if os.path.isdir('$SVCDIR/'+device.attrib['name']):
+            print(device.attrib['name'])
+            sys.exit(0)
+
+print 'No devices found in cache that match referenced devices'
+sys.exit(1)
+"`
+    RETCODE=$?
+    if [ $RETCODE -eq 0 ]; then
+        REFDEV=$REFPARSE
+        REFDIR=$SVCDIR/$REFDEV
+        REPOREF="--reference=$REFDIR"
+    else
+        echo $REFPARSE
+    fi
+    return $RETCODE
+
 }
 
 use_repo_local() {
@@ -290,6 +342,8 @@ fi
 
 PRJDIR=$(pwd)
 
+set_variables
+
 if [[ ! -d $STORE ]]; then
     echo "Note: $STORE path not found. Creating a local repo directory."
     STORE=./repo.tmp
@@ -303,6 +357,15 @@ tidy_up
 repo_init
 check_sha1_manifest
 check_cache_and_exit_if_hit
+
+if get_reference; then
+  tidy_up_and_remove_lock
+  set_store_and_lock
+  get_lock_which_releases_on_exit
+  tidy_up
+  repo_init
+fi
+
 use_repo_local
 repo_sync
 store_manifest
