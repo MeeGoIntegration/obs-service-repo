@@ -22,7 +22,7 @@ MANIFEST=.repo/manifests/$MANIFEST_NAME
 REFXML=.repo/manifests/reference.xml
 REPOCONFIG=/etc/obs/services/repo
 SVCDIR=/srv/service
-CACHE=$SVCDIR/repo/.cache
+CACHE=$SVCDIR/.cache
 
 WAIT_MINS=480 # in mins
 
@@ -123,7 +123,7 @@ repo_init() {
 # Reference devices should be ordered by preference.
 
 get_reference() {
-    REFPARSE = `python -c "
+    REFPARSE=`python -c "
 import xml.etree.cElementTree
 import sys
 import os
@@ -251,15 +251,19 @@ move_package_files() {
 }
 
 tidy_up() {
-    # Only clean up if we can enter the STORE directory
-    cd $STORE && find . -mindepth 1 -maxdepth 1 -not -name .repo -and -not -name service_running.pid -print0 | xargs -0 rm -rf
+    # Do not remove the default repo/.repo dir since there's old-style object cache
+    if [ "$STORE" == "$SVCDIR/repo" ]; then
+        # Only clean up if we can enter the STORE directory
+        cd $STORE && find . -mindepth 1 -maxdepth 1 -not -name .repo -and -not -name service_running.pid -print0 | xargs -0 rm -rf
+    else
+        rm -rf $STORE
+    fi
 }
 
 tidy_up_and_remove_lock() {
     tidy_up
     rm -f $LOCK
 }
-
 
 while test $# -gt 0; do
   case $1 in
@@ -342,7 +346,7 @@ fi
 
 PRJDIR=$(pwd)
 
-set_variables
+set_store_and_lock
 
 if [[ ! -d $STORE ]]; then
     echo "Note: $STORE path not found. Creating a local repo directory."
@@ -361,8 +365,8 @@ check_cache_and_exit_if_hit
 if get_reference; then
   tidy_up_and_remove_lock
   set_store_and_lock
+  cd $STORE
   get_lock_which_releases_on_exit
-  tidy_up
   repo_init
 fi
 
