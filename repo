@@ -127,6 +127,7 @@ get_reference() {
 import xml.etree.cElementTree
 import sys
 import os
+import glob
 try:
     ref = xml.etree.ElementTree.parse('$REFXML').getroot()
 except:
@@ -134,8 +135,17 @@ except:
     sys.exit(1)
 for device in ref:
     if device.tag == 'device' and 'name' in device.attrib:
+        # First attempt to find directory with the exact device name
         if os.path.isdir('$SVCDIR/'+device.attrib['name']):
             print(device.attrib['name'])
+            sys.exit(0)
+        # Otherwise, try to find a chain that leads to the device name
+        # eg. aosp_f5121. This scheme allows to put order in the directories,
+        # eg. 01_f5121, 02_sony-nile, or combine them, eg. 01_aosp_f5121.
+        dirlist = glob.glob('$SVCDIR/*_'+device.attrib['name'])
+        if len(dirlist) > 0:
+            dirlist.sort()
+            print(os.path.basename(dirlist[0]))
             sys.exit(0)
 
 print 'No devices found in cache that match referenced devices'
