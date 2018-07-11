@@ -23,6 +23,7 @@ REFXML=.repo/manifests/reference.xml
 REPOCONFIG=/etc/obs/services/repo
 SVCDIR=/srv/service
 CACHE=$SVCDIR/.cache
+REPOSYNC_OPTS="--no-clone-bundle --fetch-submodules -j1"
 
 WAIT_MINS=480 # in mins
 
@@ -172,7 +173,7 @@ use_repo_local() {
 
 repo_sync() {
     # Get the git repos
-    $repocmd sync --no-clone-bundle --fetch-submodules -j1 || fatal "'repo sync' command failed"
+    $repocmd sync $REPOSYNC_OPTS || fatal "'repo sync' command failed"
 }
 
 store_manifest() {
@@ -378,6 +379,7 @@ if get_reference; then
   cd $STORE
   get_lock_which_releases_on_exit
   repo_init
+  REPOSYNC_OPTS="$REPOSYNC_OPTS --current-branch"
 fi
 
 use_repo_local
