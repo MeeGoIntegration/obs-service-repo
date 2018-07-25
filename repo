@@ -23,6 +23,7 @@ REFXML=.repo/manifests/reference.xml
 REPOCONFIG=/etc/obs/services/repo
 SVCDIR=/srv/service
 CACHE=$SVCDIR/.cache
+CACHE_SHA1=""
 REPOSYNC_OPTS="--no-clone-bundle --fetch-submodules -j1"
 
 WAIT_MINS=480 # in mins
@@ -207,20 +208,19 @@ check_sha1_manifest() {
 check_cache_and_exit_if_hit() {
     # We only check the cache if *every* project has a "revision" attribute
     # since any project without one may have changed
-    MANIFEST=.repo/manifests/default.xml
     grep "<project" $MANIFEST | grep -vq "revision" && return
 
     # Check the cache:
-    SHA1=$(sha1sum $MANIFEST | cut -f1 -d" ")
-    if  [[ -f ${CACHE}/${SHA1}_repo.tar.bzip2 ]] && \
-	[[ -f ${CACHE}/${SHA1}_rpm.tar.bzip2 ]] && \
-	[[ -f ${CACHE}/${SHA1}_cache.tar.bzip2 ]] ; then
+    CACHE_SHA1=$(sha1sum $MANIFEST | cut -f1 -d" ")
+    if  [[ -f ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2 ]] && \
+	[[ -f ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 ]] && \
+	[[ -f ${CACHE}/${CACHE_SHA1}_cache.tar.bzip2 ]] ; then
 	# Found a full cache; move the big tarball and the rpm/
 	# subtree tarball to cwd
 	# use a hard link to avoid a wasteful copy
-	ln ${CACHE}/${SHA1}_repo.tar.bzip2 ${CACHE}/${SHA1}_rpm.tar.bzip2 $OUTDIR
+	ln ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2 ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 $OUTDIR
 	# and unpack any files into $OUTDIR
-	tar xjf ${CACHE}/${SHA1}_rpmfiles.tar.bzip2 -C $OUTDIR
+	tar xjf ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 -C $OUTDIR
 	echo "Used cached tarballs - done"
 	exit 0
     else
@@ -237,19 +237,21 @@ create_tarballs() {
 }
 
 cache_results() {
-    # Use the newly created as_built_manifest.xml as the key for
-    # these tarballs:
-    SHA1=$(sha1sum rpm/as_built_manifest.xml | cut -f1 -d" ")
 
-    mkdir -p ${CACHE}
+    if [ "${CACHE_SHA1}" == "" ]; then
+        echo "Not caching anything since some revisions were missing in manifest.xml"
+        return   # check_cache did not find a "revision" attribute in on of the projects
+    else
+        mkdir -p ${CACHE}
 
-    ln repo.tar.bzip2 ${CACHE}/${SHA1}_repo.tar.bzip2
-    ln rpm.tar.bzip2 ${CACHE}/${SHA1}_rpm.tar.bzip2
-    # The files (not dirs) in rpm/* will be needed
-    (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c  --files-from - --bzip2 -C $OUTDIR -f ${CACHE}/${SHA1}_rpmfiles.tar.bzip2 )
-    
-    echo "Tarballs have been cached as :"
-    ls -laF ${CACHE}/${SHA1}*
+        ln repo.tar.bzip2 ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2
+        ln rpm.tar.bzip2 ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2
+        # The files (not dirs) in rpm/* will be needed
+        (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c  --files-from - --bzip2 -C $OUTDIR -f ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 )
+        
+        echo "Tarballs have been cached as :"
+        ls -laF ${CACHE}/${CACHE_SHA1}*
+    fi
 }
 
 move_package_files() {
