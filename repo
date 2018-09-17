@@ -382,6 +382,8 @@ if get_reference; then
   get_lock_which_releases_on_exit
   repo_init
   REPOSYNC_OPTS="$REPOSYNC_OPTS --current-branch"
+else
+  REPOSYNC_OPTS="$REPOSYNC_OPTS --force-sync"
 fi
 
 use_repo_local
