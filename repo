@@ -8,12 +8,16 @@
 # of the License, or (at your option) any later version.
 # See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
 
+SVCDIR=/srv/service
+STORE=$SVCDIR/repo
 # Note the CACHE *must* be on the same fs as the STORE (and OUTDIR)
 # to avoid inter-fs copying.
+CACHE=$SVCDIR/.cache
 SVC=""
 REPO=""
 OUTDIR=""
 URL=""
+LOCK="$SVCDIR/repo/service_running.pid" # It does not need to be in $STORE.
 repocmd=/usr/bin/repo
 repourl="--repo-url=git://github.com/mer-tools/git-repo.git"
 SHA1ONLY=no
@@ -21,8 +25,6 @@ MANIFEST_NAME=default.xml
 MANIFEST=.repo/manifests/$MANIFEST_NAME
 REFXML=.repo/manifests/reference.xml
 REPOCONFIG=/etc/obs/services/repo
-SVCDIR=/srv/service
-CACHE=$SVCDIR/.cache
 CACHE_SHA1=""
 REPOSYNC_OPTS="--no-clone-bundle --fetch-submodules -j4"
 
@@ -43,16 +45,6 @@ if [ -f /etc/sysconfig/proxy ]; then
     export no_proxy=$NO_PROXY
 fi
 
-set_store_and_lock() {
-
-  if [ -z "$REFDEV" ]; then
-    STORE=$SVCDIR/repo
-  else
-    STORE=`mktemp -d -p $SVCDIR`
-  fi
-  LOCK="$STORE/service_running.pid"
-
-}
 
 get_lock_which_releases_on_exit() {
     (( WAIT=WAIT_MINS*10 )) # 6 second polling
@@ -359,8 +351,6 @@ fi
 
 PRJDIR=$(pwd)
 
-set_store_and_lock
-
 if [[ ! -d $STORE ]]; then
     echo "Note: $STORE path not found. Creating a local repo directory."
     STORE=./repo.tmp
@@ -376,10 +366,9 @@ check_sha1_manifest
 check_cache_and_exit_if_hit
 
 if get_reference; then
-  tidy_up_and_remove_lock
-  set_store_and_lock
+  tidy_up
+  STORE=`mktemp -d -p $SVCDIR`
   cd $STORE
-  get_lock_which_releases_on_exit
   repo_init
   REPOSYNC_OPTS="$REPOSYNC_OPTS --current-branch"
 else
