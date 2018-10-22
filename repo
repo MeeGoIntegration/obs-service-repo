@@ -124,8 +124,8 @@ import os
 import glob
 try:
     ref = xml.etree.ElementTree.parse('$REFXML').getroot()
-except:
-    print 'Error parsing reference.xml file'
+except Exception as e:
+    print 'Error parsing reference.xml file: ' + str(e)
     sys.exit(1)
 for device in ref:
     if device.tag == 'device' and 'name' in device.attrib:
