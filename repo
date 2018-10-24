@@ -205,12 +205,12 @@ check_cache_and_exit_if_hit() {
     # Check the cache:
     CACHE_SHA1=$(sha1sum $MANIFEST | cut -f1 -d" ")
     if  [[ -f ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2 ]] && \
-	[[ -f ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 ]] && \
-	[[ -f ${CACHE}/${CACHE_SHA1}_cache.tar.bzip2 ]] ; then
+	[[ -f ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 ]] ; then
 	# Found a full cache; move the big tarball and the rpm/
 	# subtree tarball to cwd
 	# use a hard link to avoid a wasteful copy
-	ln ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2 ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 $OUTDIR
+	ln ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2 $OUTDIR/repo.tar.bzip2
+	ln ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 $OUTDIR/rpm.tar.bzip2
 	# and unpack any files into $OUTDIR
 	tar xjf ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 -C $OUTDIR
 	echo "Used cached tarballs - done"
