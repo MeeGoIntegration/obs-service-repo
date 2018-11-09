@@ -49,27 +49,29 @@ fi
 get_lock_which_releases_on_exit() {
     (( WAIT=WAIT_MINS*10 )) # 6 second polling
     # Wait for any lockfile to be removed for a max of WAIT_MINS
+    echo $$ attempting lock
     c=1
-    while [ -f $LOCK ] && (( c < $WAIT )); do
+    while ! ( set -o noclobber; echo "$$" > "$LOCK") 2> /dev/null && \
+          (( c < $WAIT )); do
 	# Check for stale lock
 	pid=$(cat $LOCK)
 	if ! kill -0 $pid > /dev/null ; then
-	    echo "Detected stale lock - running"
+	    echo "$$ detected stale lock - running"
 	    rm -f $LOCK
 	else
-	    echo "repo service lock exists. Waiting"
+	    echo "$$ found repo service lock exists. Waiting"
 	    (( c++ ))
 	    sleep 6
 	fi
     done
     if (( c >= $WAIT )); then
-	echo "repo service could not run within $WAIT_MINS mins"
+	echo "$$ repo service could not run within $WAIT_MINS mins"
 	exit 1
     fi
 
     # Set a trap to cleanup if we exit
     trap 'tidy_up_and_remove_lock' EXIT
-    echo "$$" > $LOCK
+    echo "$$ proceeds executing"
 }
 
 usage() {
