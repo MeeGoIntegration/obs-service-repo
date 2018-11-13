@@ -8,21 +8,25 @@
 # of the License, or (at your option) any later version.
 # See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
 
-STORE=/srv/service/repo
+SVCDIR=/srv/service
+STORE=$SVCDIR/repo
 # Note the CACHE *must* be on the same fs as the STORE (and OUTDIR)
 # to avoid inter-fs copying.
-CACHE=/srv/service/repo/.cache
+CACHE=$SVCDIR/.cache
 SVC=""
 REPO=""
 OUTDIR=""
 URL=""
-LOCK="$STORE/service_running.pid"
+LOCK="$SVCDIR/repo/service_running.pid" # It does not need to be in $STORE.
 repocmd=/usr/bin/repo
 repourl="--repo-url=git://github.com/mer-tools/git-repo.git"
 SHA1ONLY=no
 MANIFEST_NAME=default.xml
 MANIFEST=.repo/manifests/$MANIFEST_NAME
+REFXML=.repo/manifests/reference.xml
 REPOCONFIG=/etc/obs/services/repo
+CACHE_SHA1=""
+REPOSYNC_OPTS="--no-clone-bundle --fetch-submodules -j4"
 
 WAIT_MINS=480 # in mins
 
@@ -45,27 +49,29 @@ fi
 get_lock_which_releases_on_exit() {
     (( WAIT=WAIT_MINS*10 )) # 6 second polling
     # Wait for any lockfile to be removed for a max of WAIT_MINS
+    echo $$ attempting lock
     c=1
-    while [ -f $LOCK ] && (( c < $WAIT )); do
+    while ! ( set -o noclobber; echo "$$" > "$LOCK") 2> /dev/null && \
+          (( c < $WAIT )); do
 	# Check for stale lock
 	pid=$(cat $LOCK)
 	if ! kill -0 $pid > /dev/null ; then
-	    echo "Detected stale lock - running"
+	    echo "$$ detected stale lock - running"
 	    rm -f $LOCK
 	else
-	    echo "repo service lock exists. Waiting"
+	    echo "$$ found repo service lock exists. Waiting"
 	    (( c++ ))
 	    sleep 6
 	fi
     done
     if (( c >= $WAIT )); then
-	echo "repo service could not run within $WAIT_MINS mins"
+	echo "$$ repo service could not run within $WAIT_MINS mins"
 	exit 1
     fi
 
     # Set a trap to cleanup if we exit
     trap 'tidy_up_and_remove_lock' EXIT
-    echo "$$" > $LOCK
+    echo "$$ proceeds executing"
 }
 
 usage() {
@@ -96,9 +102,61 @@ fatal() {
 
 repo_init() {
     # Get the manifest
-    if ! $repocmd init $repourl -u $URL -b $BRANCH -m $MANIFEST_NAME; then
-	fatal "command 'repo init -u $URL -b $BRANCH -m $MANIFEST_NAME' returned an error"
+    if ! $repocmd init $repourl -u $URL -b $BRANCH -m $MANIFEST_NAME $REPOREF; then
+	fatal "command 'repo init -u $URL -b $BRANCH -m $MANIFEST_NAME $REPOREF' returned an error"
     fi
+}
+
+# Example reference.xml file
+#  <reference>
+#     <device name="f5121" url="https://github.com/mer-hybris/android.git" branch="hybris-sony-aosp-6.0.1_r80-20170902"/>
+#     <device name="aosp" url="https://android.googlesource.com/platform/manifest" branch="master"/>
+#  </reference>
+#
+# Currently only "name" attributes are taken into account, but in the future,
+# the url and branch could be used to initialize a reference mirror first.
+#
+# Reference devices should be ordered by preference.
+
+get_reference() {
+    REFPARSE=`python -c "
+import xml.etree.cElementTree
+import sys
+import os
+import glob
+try:
+    ref = xml.etree.ElementTree.parse('$REFXML').getroot()
+except Exception as e:
+    print 'Error parsing reference.xml file: ' + str(e)
+    sys.exit(1)
+for device in ref:
+    if device.tag == 'device' and 'name' in device.attrib:
+        # First attempt to find directory with the exact device name
+        if os.path.isdir('$SVCDIR/'+device.attrib['name']):
+            print(device.attrib['name'])
+            sys.exit(0)
+        # Otherwise, try to find a chain that leads to the device name
+        # eg. aosp_f5121. This scheme allows to put order in the directories,
+        # eg. 01_f5121, 02_sony-nile, or combine them, eg. 01_aosp_f5121.
+        dirlist = glob.glob('$SVCDIR/*_'+device.attrib['name'])
+        if len(dirlist) > 0:
+            dirlist.sort()
+            print(os.path.basename(dirlist[0]))
+            sys.exit(0)
+
+print 'No devices found in cache that match referenced devices'
+sys.exit(1)
+"`
+    RETCODE=$?
+    if [ $RETCODE -eq 0 ]; then
+        REFDEV=$REFPARSE
+        REFDIR=$SVCDIR/$REFDEV
+        REPOREF="--reference=$REFDIR"
+    else
+        echo $REFPARSE
+    fi
+    return $RETCODE
+
 }
 
 use_repo_local() {
@@ -110,7 +168,7 @@ use_repo_local() {
 
 repo_sync() {
     # Get the git repos
-    $repocmd sync --no-clone-bundle --fetch-submodules -j1 || fatal "'repo sync' command failed"
+    $repocmd sync $REPOSYNC_OPTS || fatal "'repo sync' command failed"
 }
 
 store_manifest() {
@@ -144,20 +202,19 @@ check_sha1_manifest() {
 check_cache_and_exit_if_hit() {
     # We only check the cache if *every* project has a "revision" attribute
     # since any project without one may have changed
-    MANIFEST=.repo/manifests/default.xml
     grep "<project" $MANIFEST | grep -vq "revision" && return
 
     # Check the cache:
-    SHA1=$(sha1sum $MANIFEST | cut -f1 -d" ")
-    if  [[ -f ${CACHE}/${SHA1}_repo.tar.bzip2 ]] && \
-	[[ -f ${CACHE}/${SHA1}_rpm.tar.bzip2 ]] && \
-	[[ -f ${CACHE}/${SHA1}_cache.tar.bzip2 ]] ; then
+    CACHE_SHA1=$(sha1sum $MANIFEST | cut -f1 -d" ")
+    if  [[ -f ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2 ]] && \
+	[[ -f ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 ]] ; then
 	# Found a full cache; move the big tarball and the rpm/
 	# subtree tarball to cwd
 	# use a hard link to avoid a wasteful copy
-	ln ${CACHE}/${SHA1}_repo.tar.bzip2 ${CACHE}/${SHA1}_rpm.tar.bzip2 $OUTDIR
+	ln ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2 $OUTDIR/repo.tar.bzip2
+	ln ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 $OUTDIR/rpm.tar.bzip2
 	# and unpack any files into $OUTDIR
-	tar xjf ${CACHE}/${SHA1}_rpmfiles.tar.bzip2 -C $OUTDIR
+	tar xjf ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 -C $OUTDIR
 	echo "Used cached tarballs - done"
 	exit 0
     else
@@ -174,19 +231,21 @@ create_tarballs() {
 }
 
 cache_results() {
-    # Use the newly created as_built_manifest.xml as the key for
-    # these tarballs:
-    SHA1=$(sha1sum rpm/as_built_manifest.xml | cut -f1 -d" ")
 
-    mkdir -p ${CACHE}
+    if [ "${CACHE_SHA1}" == "" ]; then
+        echo "Not caching anything since some revisions were missing in manifest.xml"
+        return   # check_cache did not find a "revision" attribute in on of the projects
+    else
+        mkdir -p ${CACHE}
 
-    ln repo.tar.bzip2 ${CACHE}/${SHA1}_repo.tar.bzip2
-    ln rpm.tar.bzip2 ${CACHE}/${SHA1}_rpm.tar.bzip2
-    # The files (not dirs) in rpm/* will be needed
-    (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c  --files-from - --bzip2 -C $OUTDIR -f ${CACHE}/${SHA1}_rpmfiles.tar.bzip2 )
-    
-    echo "Tarballs have been cached as :"
-    ls -laF ${CACHE}/${SHA1}*
+        ln repo.tar.bzip2 ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2
+        ln rpm.tar.bzip2 ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2
+        # The files (not dirs) in rpm/* will be needed
+        (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c  --files-from - --bzip2 -C $OUTDIR -f ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 )
+        
+        echo "Tarballs have been cached as :"
+        ls -laF ${CACHE}/${CACHE_SHA1}*
+    fi
 }
 
 move_package_files() {
@@ -199,15 +258,19 @@ move_package_files() {
 }
 
 tidy_up() {
-    # Only clean up if we can enter the STORE directory
-    cd $STORE && find . -mindepth 1 -maxdepth 1 -not -name .repo -and -not -name service_running.pid -print0 | xargs -0 rm -rf
+    # Do not remove the default repo/.repo dir since there's old-style object cache
+    if [ "$STORE" == "$SVCDIR/repo" ]; then
+        # Only clean up if we can enter the STORE directory
+        cd $STORE && find . -mindepth 1 -maxdepth 1 -not -name .repo -and -not -name service_running.pid -print0 | xargs -0 rm -rf
+    else
+        rm -rf $STORE
+    fi
 }
 
 tidy_up_and_remove_lock() {
     tidy_up
     rm -f $LOCK
 }
-
 
 while test $# -gt 0; do
   case $1 in
@@ -303,6 +366,17 @@ tidy_up
 repo_init
 check_sha1_manifest
 check_cache_and_exit_if_hit
+
+if get_reference; then
+  tidy_up
+  STORE=`mktemp -d -p $SVCDIR`
+  cd $STORE
+  repo_init
+  REPOSYNC_OPTS="$REPOSYNC_OPTS --current-branch"
+else
+  REPOSYNC_OPTS="$REPOSYNC_OPTS --force-sync"
+fi
+
 use_repo_local
 repo_sync
 store_manifest
