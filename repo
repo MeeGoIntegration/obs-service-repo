@@ -53,6 +53,9 @@ get_lock_which_releases_on_exit() {
     c=1
     while ! ( set -o noclobber; echo "$$" > "$LOCK") 2> /dev/null && \
           (( c < $WAIT )); do
+
+        sleep $(( $RANDOM / 3000 )).$(( $RANDOM / 3 ))
+
 	# Check for stale lock
 	pid=$(cat $LOCK)
 	if ! kill -0 $pid > /dev/null ; then
