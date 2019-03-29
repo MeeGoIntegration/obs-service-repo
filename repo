@@ -27,6 +27,7 @@ REFXML=.repo/manifests/reference.xml
 REPOCONFIG=/etc/obs/services/repo
 CACHE_SHA1=""
 REPOSYNC_OPTS="--no-clone-bundle --fetch-submodules -j4"
+MYPID=$$
 
 WAIT_MINS=480 # in mins
 
@@ -45,37 +46,6 @@ if [ -f /etc/sysconfig/proxy ]; then
     export no_proxy=$NO_PROXY
 fi
 
-
-get_lock_which_releases_on_exit() {
-    (( WAIT=WAIT_MINS*10 )) # 6 second polling
-    # Wait for any lockfile to be removed for a max of WAIT_MINS
-    echo $$ attempting lock
-    c=1
-    while ! ( set -o noclobber; echo "$$" > "$LOCK") 2> /dev/null && \
-          (( c < $WAIT )); do
-
-        sleep $(( $RANDOM / 3000 )).$(( $RANDOM / 3 ))
-
-	# Check for stale lock
-	pid=$(cat $LOCK)
-	if ! kill -0 $pid > /dev/null ; then
-	    echo "$$ detected stale lock - running"
-	    rm -f $LOCK
-	else
-	    echo "$$ found repo service lock exists. Waiting"
-	    (( c++ ))
-	    sleep 6
-	fi
-    done
-    if (( c >= $WAIT )); then
-	echo "$$ repo service could not run within $WAIT_MINS mins"
-	exit 1
-    fi
-
-    # Set a trap to cleanup if we exit
-    trap 'tidy_up_and_remove_lock' EXIT
-    echo "$$ proceeds executing"
-}
 
 usage() {
   cat <<EOF
@@ -270,9 +240,9 @@ tidy_up() {
     fi
 }
 
-tidy_up_and_remove_lock() {
-    tidy_up
-    rm -f $LOCK
+fail_lock() {
+    echo "$MYPID repo service could not run within $WAIT_MINS mins"
+    exit 1
 }
 
 while test $# -gt 0; do
@@ -364,29 +334,34 @@ fi
 
 cd $STORE
 
-get_lock_which_releases_on_exit
-tidy_up
-repo_init
-check_sha1_manifest
-check_cache_and_exit_if_hit
+echo $MYPID attempting lock
 
-if get_reference; then
+( flock -w 28800 9 || fail_lock
+  trap 'tidy_up' EXIT
+
   tidy_up
-  STORE=`mktemp -d -p $SVCDIR`
-  cd $STORE
   repo_init
-  REPOSYNC_OPTS="$REPOSYNC_OPTS --current-branch"
-else
-  REPOSYNC_OPTS="$REPOSYNC_OPTS --force-sync"
-fi
+  check_sha1_manifest
+  check_cache_and_exit_if_hit
 
-use_repo_local
-repo_sync
-store_manifest
-process_spec_files
-create_tarballs
-cache_results
-move_package_files
-tidy_up
+  if get_reference; then
+    tidy_up
+    STORE=`mktemp -d -p $SVCDIR`
+    cd $STORE
+    repo_init
+    REPOSYNC_OPTS="$REPOSYNC_OPTS --current-branch"
+  else
+    REPOSYNC_OPTS="$REPOSYNC_OPTS --force-sync"
+  fi
+
+  use_repo_local
+  repo_sync
+  store_manifest
+  process_spec_files
+  create_tarballs
+  cache_results
+  move_package_files
+  tidy_up
+) 9>$LOCK
 
 exit 0
