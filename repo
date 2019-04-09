@@ -17,7 +17,7 @@ SVC=""
 REPO=""
 OUTDIR=""
 URL=""
-LOCK="$SVCDIR/repo/service_running.pid" # It does not need to be in $STORE.
+LOCK="$SVCDIR/repo/service_lockfile" # It does not need to be in $STORE.
 repocmd=/usr/bin/repo
 repourl="--repo-url=git://github.com/mer-tools/git-repo.git"
 SHA1ONLY=no
@@ -336,7 +336,7 @@ cd $STORE
 
 echo $MYPID attempting lock
 
-( flock -w 28800 9 || fail_lock
+( flock -w $(($WAIT_MINS * 60)) 9 || fail_lock
   trap 'tidy_up' EXIT
 
   tidy_up
