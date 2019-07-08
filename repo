@@ -17,7 +17,8 @@ SVC=""
 REPO=""
 OUTDIR=""
 URL=""
-LOCK="$SVCDIR/repo/service_lockfile" # It does not need to be in $STORE.
+LOCKFILE=service_lockfile
+LOCK="$SVCDIR/repo/$LOCKFILE" # It does not need to be in $STORE.
 repocmd=/usr/bin/repo
 repourl="--repo-url=git://github.com/mer-tools/git-repo.git"
 SHA1ONLY=no
@@ -234,7 +235,7 @@ tidy_up() {
     # Do not remove the default repo/.repo dir since there's old-style object cache
     if [ "$STORE" == "$SVCDIR/repo" ]; then
         # Only clean up if we can enter the STORE directory
-        cd $STORE && find . -mindepth 1 -maxdepth 1 -not -name .repo -and -not -name service_running.pid -print0 | xargs -0 rm -rf
+        cd $STORE && find . -mindepth 1 -maxdepth 1 -not -name .repo -and -not -name "$LOCKFILE" -print0 | xargs -0 rm -rf
     else
         rm -rf $STORE
     fi
@@ -318,7 +319,7 @@ do
     fi
 done < $REPOCONFIG
 if [ -z "$svc_name" ]; then
-    echo "Sorry, git service $SVC is not whitelisted. please contact ask your OBS administrator to add it to the repo config file $REPOCONFIG if you need it."
+    echo "Sorry, git service $SVC is not whitelisted. please ask your OBS administrator to add it to the repo config file $REPOCONFIG if you need it."
     exit 1
 else
     URL=${svc_url}${REPO}.git
