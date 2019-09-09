@@ -159,7 +159,7 @@ process_spec_files() {
     for spec in rpm/*.spec; do
 	perl -i -ne 'BEGIN { sub pinc {if (/^%include\s+([\w-.\/]+)$/) { print "# repo service performed : %%include $1\n"; local (*I); open I,"<$1" or print "# Couldnt open $1\n"; while (<I>) { pinc(); }; } else { print $_; }}} pinc;' $spec
 	# Add the as_built_manifest.xml to the Sources
-	perl -i -e 'while (<>) { print $_; last if /^Source0:/;}; print "Source755: as_built_manifest.xml\n"; while (<>) { print $_;} ' $spec
+	perl -i -e 'while (<>) { print $_; last if /^Source40:/;}; print "Source755: as_built_manifest.xml\n"; while (<>) { print $_;} ' $spec
 
     done
 
