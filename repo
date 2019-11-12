@@ -189,6 +189,10 @@ check_cache_and_exit_if_hit() {
 	ln ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 $OUTDIR/rpm.tar.bzip2
 	# and unpack any files into $OUTDIR
 	tar xjf ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 -C $OUTDIR
+	# Touch the used files so the cleanup cron job knows they've been useful
+	touch ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2 \
+		${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2 \
+		${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2
 	echo "Used cached tarballs - done"
 	exit 0
     else
