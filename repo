@@ -219,7 +219,7 @@ cache_results() {
         ln repo.tar.bzip2 ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2
         ln rpm.tar.bzip2 ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2
         # The files (not dirs) in rpm/* will be needed
-        (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c  --files-from - --bzip2 -C $OUTDIR -f ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 )
+        (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c --files-from - --bzip2 -f ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 )
         
         echo "Tarballs have been cached as :"
         ls -laF ${CACHE}/${CACHE_SHA1}*
