@@ -11,6 +11,7 @@ Source0:    %{name}-%{version}.tar.xz
 Requires:   obs-source_service
 Requires:   git-core
 Requires:   python
+Requires:   pbzip2
 
 %description
 %{summary}.
