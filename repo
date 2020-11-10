@@ -202,10 +202,10 @@ check_cache_and_exit_if_hit() {
 }
 
 create_tarballs() {
-    find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm -o -name repo.tar.bzip2 \) -print | tar c --bzip2 -f repo.tar.bzip2 --files-from -  || fatal "'tar' command failed creating repo.tar.bzip2"
+    find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm -o -name repo.tar.bzip2 \) -print | tar c --files-from - | pbzip2 -c > repo.tar.bzip2  || fatal "'tar' command failed creating repo.tar.bzip2"
 	# Now store any subdirs and symlinks in rpm/ that need keeping
 	# SOURCE: files are moved directly to $OUTDIR
-	(cd rpm; find . -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print  | tar c --bzip2 -f ../rpm.tar.bzip2 --files-from - ) || fatal "'tar' command failed creating rpm.tar.bzip2"
+	(cd rpm; find . -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -print  | tar c --files-from - | pbzip2 -c > ../rpm.tar.bzip2 ) || fatal "'tar' command failed creating rpm.tar.bzip2"
 }
 
 cache_results() {
@@ -219,7 +219,7 @@ cache_results() {
         ln repo.tar.bzip2 ${CACHE}/${CACHE_SHA1}_repo.tar.bzip2
         ln rpm.tar.bzip2 ${CACHE}/${CACHE_SHA1}_rpm.tar.bzip2
         # The files (not dirs) in rpm/* will be needed
-        (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c --files-from - --bzip2 -f ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 )
+        (cd rpm; find . -mindepth 1 -maxdepth 1 -type f -print  | tar c --files-from - | pbzip2 -c > ${CACHE}/${CACHE_SHA1}_rpmfiles.tar.bzip2 )
         
         echo "Tarballs have been cached as :"
         ls -laF ${CACHE}/${CACHE_SHA1}*
