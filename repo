@@ -20,7 +20,7 @@ URL=""
 LOCKFILE=service_lockfile
 LOCK="$SVCDIR/repo/$LOCKFILE" # It does not need to be in $STORE.
 repocmd=/usr/bin/repo
-repourl="--repo-url=git://github.com/mer-tools/git-repo.git"
+repourl="--repo-url=git://github.com/mer-tools/git-repo.git --no-repo-verify"
 SHA1ONLY=no
 MANIFEST_NAME=default.xml
 MANIFEST=.repo/manifests/$MANIFEST_NAME
