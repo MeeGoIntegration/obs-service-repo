@@ -76,7 +76,7 @@ fatal() {
 
 repo_init() {
     # Get the manifest
-    if ! $repocmd init $repourl -u $URL -b $BRANCH -m $MANIFEST_NAME --platform=linux $REPOREF; then
+    if ! $repocmd init $repourl -u $URL -b $BRANCH -m $MANIFEST_NAME --platform=linux --no-clone-bundle $REPOREF; then
 	fatal "command 'repo init -u $URL -b $BRANCH -m $MANIFEST_NAME $REPOREF' returned an error"
     fi
 }
