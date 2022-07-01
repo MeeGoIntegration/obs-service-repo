@@ -70,7 +70,7 @@ EOF
 
 fatal() {
     usage
-    echo $@
+    echo "$@"
     exit 1
 }
 
@@ -93,7 +93,7 @@ repo_init() {
 # Reference devices should be ordered by preference.
 
 get_reference() {
-    REFPARSE=`python -c "
+    REFPARSE=$(python -c "
 import xml.etree.cElementTree
 import sys
 import os
@@ -101,7 +101,7 @@ import glob
 try:
     ref = xml.etree.ElementTree.parse('$REFXML').getroot()
 except Exception as e:
-    print 'Error parsing reference.xml file: ' + str(e)
+    print ('Error parsing reference.xml file: ' + str(e))
     sys.exit(1)
 for device in ref:
     if device.tag == 'device' and 'name' in device.attrib:
@@ -118,9 +118,9 @@ for device in ref:
             print(os.path.basename(dirlist[0]))
             sys.exit(0)
 
-print 'No devices found in cache that match referenced devices'
+print('No devices found in cache that match referenced devices')
 sys.exit(1)
-"`
+")
     RETCODE=$?
     if [ $RETCODE -eq 0 ]; then
         REFDEV=$REFPARSE
@@ -329,7 +329,7 @@ else
     URL=${svc_url}${REPO}.git
 fi
 
-PRJDIR=$(pwd)
+PRJDIR="$PWD"
 
 if [[ ! -d $STORE ]]; then
     echo "Note: $STORE path not found. Creating a local repo directory."
@@ -337,7 +337,7 @@ if [[ ! -d $STORE ]]; then
     mkdir -p $STORE || fatal "Could not create $STORE"
 fi
 
-cd $STORE
+cd $STORE || exit 1
 
 echo $MYPID attempting lock
 
@@ -351,8 +351,8 @@ echo $MYPID attempting lock
 
   if get_reference; then
     tidy_up
-    STORE=`mktemp -d -p $SVCDIR`
-    cd $STORE
+    STORE=$(mktemp -d -p $SVCDIR)
+    cd $STORE || exit 1
     repo_init
     REPOSYNC_OPTS="$REPOSYNC_OPTS --current-branch"
   else
