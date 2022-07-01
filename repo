@@ -48,7 +48,7 @@ if [ -f /etc/sysconfig/proxy ]; then
 fi
 
 if [ -z "$OBS_SERVICE_REPO_SYNC_JOBS" ] ; then
-    OBS_SERVICE_REPO_SYNC_JOBS=4
+    OBS_SERVICE_REPO_SYNC_JOBS=$(($(nproc)/2))
  fi
 
 usage() {
