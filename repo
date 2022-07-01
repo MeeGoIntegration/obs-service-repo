@@ -101,7 +101,7 @@ import glob
 try:
     ref = xml.etree.ElementTree.parse('$REFXML').getroot()
 except Exception as e:
-    print 'Error parsing reference.xml file: ' + str(e)
+    print ('Error parsing reference.xml file: ' + str(e))
     sys.exit(1)
 for device in ref:
     if device.tag == 'device' and 'name' in device.attrib:
@@ -118,7 +118,7 @@ for device in ref:
             print(os.path.basename(dirlist[0]))
             sys.exit(0)
 
-print 'No devices found in cache that match referenced devices'
+print('No devices found in cache that match referenced devices')
 sys.exit(1)
 "`
     RETCODE=$?
