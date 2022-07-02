@@ -27,7 +27,7 @@ MANIFEST=.repo/manifests/$MANIFEST_NAME
 REFXML=.repo/manifests/reference.xml
 REPOCONFIG=/etc/obs/services/repo
 CACHE_SHA1=""
-REPOSYNC_OPTS="--no-clone-bundle --fetch-submodules -j4"
+REPOSYNC_OPTS="--no-clone-bundle --fetch-submodules"
 MYPID=$$
 
 WAIT_MINS=480 # in mins
@@ -47,6 +47,9 @@ if [ -f /etc/sysconfig/proxy ]; then
     export no_proxy=$NO_PROXY
 fi
 
+if [ -z "$OBS_SERVICE_REPO_SYNC_JOBS" ] ; then
+    OBS_SERVICE_REPO_SYNC_JOBS=$(($(nproc)/2))
+ fi
 
 usage() {
   cat <<EOF
@@ -142,7 +145,7 @@ use_repo_local() {
 
 repo_sync() {
     # Get the git repos
-    $repocmd sync $REPOSYNC_OPTS || fatal "'repo sync' command failed"
+    $repocmd sync $REPOSYNC_OPTS -j$OBS_SERVICE_REPO_SYNC_JOBS || fatal "'repo sync' command failed"
 }
 
 store_manifest() {
