@@ -96,7 +96,7 @@ repo_init() {
 # Reference devices should be ordered by preference.
 
 get_reference() {
-    REFPARSE=$(python -c "
+    REFPARSE=$(python3 -c "
 import xml.etree.cElementTree
 import sys
 import os
