@@ -204,6 +204,11 @@ check_cache_and_exit_if_hit() {
     fi
 }
 
+remove_unwanted_files() {
+    # Files in .git dirs link to .repo, which is not included so they are useless
+    find . -name .repo -prune -o -type d -name .git -print0 | xargs -0 rm -r
+}
+
 create_tarballs() {
     find . -mindepth 1 -maxdepth 1 -not \( -name .repo -o -name rpm -o -name repo.tar.bzip2 \) -print | tar c --files-from - | pbzip2 -c > repo.tar.bzip2  || fatal "'tar' command failed creating repo.tar.bzip2"
 	# Now store any subdirs and symlinks in rpm/ that need keeping
@@ -366,6 +371,7 @@ echo $MYPID attempting lock
   repo_sync
   store_manifest
   process_spec_files
+  remove_unwanted_files
   create_tarballs
   cache_results
   move_package_files
